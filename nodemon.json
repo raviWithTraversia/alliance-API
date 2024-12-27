@@ -1,0 +1,7 @@
+{
+  "ignore": [
+    "*.log.*"
+  ],
+  "ext": "ts",
+  "exec": "ts-node src/index.ts"
+}

@@ -9,6 +9,7 @@ import { connectionMongoDb } from './configs/connection';
 // ROUTE HANDLERS
 import searchRoutes from "./routes/search.routes";
 import airPricingRoutes from "./routes/air-pricing.routes";
+import bookRoutes from "./routes/air-book.routes";
 
 dotenv.config({ path: `${ROOT_DIR}/.env` });
 
@@ -24,6 +25,7 @@ if (!MONGO_URI) throw new Error("MONGO_URI is not defined in .env file");
 
 app.use("/api/flight", searchRoutes);
 app.use("/api/pricing", airPricingRoutes);
+app.use("/api/booking", bookRoutes);
 app.use("/api", (req: Request, res: Response) => {
     res.json({ message: "9I API" });
 })

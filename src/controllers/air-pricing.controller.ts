@@ -1,6 +1,4 @@
 import { Request, Response } from "express";
-import { handleFlightSearch } from "../core/search.core";
-import { SearchRequest } from "../interfaces/search.interface";
 import { handleAirPricing } from "../core/air-pricing.core";
 
 export async function airPricingController(req: Request, res: Response) {

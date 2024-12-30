@@ -12,6 +12,6 @@ export function check(key: string) {
     }
 }
 
-export function isValidDate(value: string) {
-    return dayjs(value, 'DD-MM-YYYY', true).isValid();
+export function isValidDate(value: string, format?: string) {
+    return dayjs(value, format || 'DD-MM-YYYY', true).isValid();
 };

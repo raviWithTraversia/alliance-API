@@ -26,7 +26,7 @@ import { getPriceBreakup, Pax } from "../utils/price-breakup";
  */
 export async function handleFlightSearch(request: SearchRequest) {
     try {
-        const config: Config = await getConfig(request.credentialType);
+        const config = await getConfig(request.credentialType);
 
         const origin = request.sectors[0].origin;
         const destination = request.sectors[0].destination;

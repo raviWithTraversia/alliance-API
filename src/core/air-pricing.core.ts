@@ -1,22 +1,25 @@
 import { randomUUID } from "crypto";
+import { AirPricingRequest, AirPricingResponse } from "../interfaces/air-pricing.interface";
 
-export async function handleAirPricing(request: any) {
+export async function handleAirPricing(request: AirPricingRequest) {
     try {
-        const commonResponse: any = {
+        const fieldsBeforePriceChange = {
+            journeyKey: "",
+            origin: "",
+            destination: "",
+        };
+        const commonResponse: AirPricingResponse = {
             uniqueKey: request.uniqueKey || randomUUID(),
             traceId: request.traceId || randomUUID(),
             journey: [{
-                journeyKey: "",
-                origin: "",
-                destination: "",
+                ...fieldsBeforePriceChange,
                 priceChange: false,
                 ...request.journey[0]
             }]
-        }
+        };
         return commonResponse;
     } catch (error: any) {
         console.log({ error });
         return { error: { message: error.message, stack: error.stack } }
     }
-
 }

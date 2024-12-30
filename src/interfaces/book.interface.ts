@@ -1,8 +1,42 @@
-import { Journey } from "./search.interface";
+import { CredentialType, Journey, TravelType, TypeOfTrip, Vendor } from "./search.interface";
 
 export type PaxType = ["ADT", "CHD", "INF"];
 export interface BookingJourney extends Journey {
     travellerDetails: TravelerDetails[]
+}
+export interface BookingResponseJourney extends BookingJourney {
+    status: BookingStatus;
+    recLocInfo: null | RecordLocator[];
+}
+export interface ETicket {
+    eTicketNumber: string
+}
+export interface BookingResponse {
+    uniqueKey: string;
+    traceId: string;
+    journey: BookingResponseJourney[];
+}
+export interface BookingStatus {
+    pnrStatus: "Failed" | "Pending" | "Confirmed";
+    paymentStatus: "Unpaid" | "Paid";
+}
+export interface RecordLocator {
+    type: string;
+    pnr: string;
+}
+export interface BookingRequest {
+    typeOfTrip: TypeOfTrip;
+    credentialType: CredentialType;
+    travelType: TravelType;
+    uniqueKey: string;
+    traceId: string;
+    vendorList: Vendor[];
+    journey: BookingJourney[];
+}
+export interface BookingResponse {
+    uniqueKey: string;
+    traceId: string;
+    journey: BookingResponseJourney[];
 }
 export interface TravelerDetails {
     travellerId: string;
@@ -22,6 +56,7 @@ export interface TravelerDetails {
     nationality: string;
     department: string;
     designation: string;
+    eTicket: null | ETicket[]
 }
 
 export interface PassportDetails {

@@ -6,6 +6,7 @@ export interface Config {
         fare: string;
         book: string;
         payment: string;
+        retrieve_booking: string;
     }
 };
 
@@ -15,7 +16,8 @@ const testCreds: Config = {
         search: "get_schedule_v2",
         fare: "get_fare_v2_new",
         book: "booking_v2",
-        payment: "payment"
+        payment: "payment",
+        retrieve_booking: "get_all_book_info_2"
 
     }
 };
@@ -25,7 +27,8 @@ const liveCreds: Config = {
         search: "get_schedule_v2",
         fare: "get_fare_v2_new",
         book: "booking_v2",
-        payment: "payment"
+        payment: "payment",
+        retrieve_booking: "get_all_book_info_2"
     }
 };
 export async function getConfig(ENV: string): Promise<Config> {

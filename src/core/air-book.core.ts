@@ -2,28 +2,31 @@ import { randomUUID } from "crypto";
 import { Config, DEFAULTS, getConfig } from "../configs/config";
 import { AirSegment, Itinerary, Journey } from "../interfaces/search.interface";
 import dayjs from "dayjs";
-import { BookingJourney, PaxType, TravelerDetails } from "../interfaces/book.interface";
+import { BookingJourney, BookingRequest, BookingResponse, BookingStatus, ETicket, PaxType, TravelerDetails } from "../interfaces/book.interface";
 import axios from "axios";
 import { saveLogInFile } from "../utils/save-log";
 
-export async function handleBooking(request: any) {
+export async function handleBooking(request: BookingRequest) {
     try {
         const config = await getConfig(request.credentialType);
         const bookResponse = await processBooking(request, config);
-        const defaultStatus = {
+        const defaultStatus: BookingStatus = {
             pnrStatus: "Failed",
             paymentStatus: "Unpaid"
         };
-        const response: any = {
+        const fieldsBeforeStatus = {
+            journeyKey: "",
+            origin: "",
+            destination: "",
+        };
+        const response: BookingResponse = {
             uniqueKey: request.uniqueKey || randomUUID(),
             traceId: request.traceId || randomUUID(),
             journey: [{
-                journeyKey: "",
-                origin: "",
-                destination: "",
+                ...fieldsBeforeStatus,
                 status: defaultStatus,
                 recLocInfo: null,
-                ...request.journey[0]
+                ...request.journey[0],
             }]
         };
         if (bookResponse?.error) {
@@ -37,17 +40,17 @@ export async function handleBooking(request: any) {
         const paymentResponse = await processPayment(request, config, bookResponse);
         if (paymentResponse?.ticket_unit?.length) {
             defaultStatus.paymentStatus = "Paid";
-            const ticketMap: any = {};
+            const ticketMap: { [key: string]: ETicket[] } = {};
             paymentResponse?.ticket_unit?.forEach?.((ticket: any) => {
                 if (!ticketMap[ticket[0]]) ticketMap[ticket[0]] = [];
-                ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] });
+                ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] } as ETicket);
             });
-            response.journey[0].travellerDetails.forEach((traveler: any) => {
+            response.journey[0].travellerDetails.forEach((traveler) => {
                 const fullName = `${traveler.firstName} ${traveler.lastName}`.toUpperCase();
                 traveler.eTicket = ticketMap[fullName] || null;
             })
         }
-        return { paymentResponse, response };
+        return response;
     } catch (bookError: any) {
         console.log({ bookError });
         return { error: { message: bookError.message, stack: bookError.stack } }
@@ -120,6 +123,7 @@ export async function processBooking(request: any, config: Config) {
         saveLogInFile("book-req.json", url.toString());
         const response = await axios.get(url.toString());
         saveLogInFile("book-res.json", response.data);
+        if (response.data.err_code != "0") return { error: response.data?.err_msg || response?.data?.error_message || "Error while processing booking" }
         return response.data;
     } catch (error: any) {
         console.log({ processBookingError: error });
@@ -141,6 +145,7 @@ export async function processPayment(request: any, config: Config, bookResponse:
         saveLogInFile("payment.req.json", url.toString());
         const response = await axios.get(url.toString());
         saveLogInFile("payment.res.json", response.data);
+        if (response.data.err_code != "0") return { error: response.data?.err_msg || response?.data?.error_message || "Error while processing payment" }
         return response.data;
     } catch (error: any) {
         console.log({ error });

@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { searchFlights } from '../controllers/search.controller';
+import { searchController } from '../controllers/search.controller';
 import { searchValidations } from '../utils/validations/search.validations';
 import { validateRequest } from '../middleware/validateRequest';
 
 const router = Router();
 
-router.post('/search', searchValidations, validateRequest, searchFlights);
+router.post('/search', searchValidations, validateRequest, searchController);
 
 export default router;

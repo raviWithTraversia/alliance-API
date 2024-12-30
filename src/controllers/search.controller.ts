@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { handleFlightSearch } from "../core/search.core";
 import { SearchRequest } from "../interfaces/search.interface";
 
-export async function searchFlights(req: Request, res: Response) {
+export async function searchController(req: Request, res: Response) {
     try {
         const result: any = await handleFlightSearch(req.body as SearchRequest);
         if (result.error)

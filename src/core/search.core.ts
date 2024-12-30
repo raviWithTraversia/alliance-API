@@ -32,7 +32,7 @@ export async function handleFlightSearch(request: SearchRequest) {
         const destination = request.sectors[0].destination;
         const credentials = request.vendorList[0].credential;
         const departureDate = dayjs(request.sectors[0].departureDate, "DD-MM-YYYY").format("YYYYMMDD");
-        const returnFlight = request.typeOfTrip === "ROUNDTRIP" ? 1 : 0;
+        const returnFlight = request.typeOfTrip === "ROUNDTRIP" && request.travelType === "INT" ? 1 : 0;
 
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
@@ -100,7 +100,8 @@ export async function convertCommonSearchResponse(
             }
         }
     }
-    return { commonResponse, result };
+    return commonResponse;
+    // return { commonResponse, result };
 }
 
 export async function retrieveFareFromItinerary(
@@ -117,8 +118,8 @@ export async function retrieveFareFromItinerary(
 
         options.set("action", config.endpoints.fare);
         options.set("flight_no", flightNumbers.join(","));
-        options.delete("return_flight");
-        options.delete("return_flight_date");
+        // options.delete("return_flight");
+        // options.delete("return_flight_date");
         url.search = options.toString();
 
         const fareDetailsResponse = await axios.get(url.toString());

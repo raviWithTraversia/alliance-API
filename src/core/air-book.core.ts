@@ -1,9 +1,13 @@
-import { randomUUID } from "crypto";
-import { Config, DEFAULTS, getConfig } from "../configs/config";
-import { AirSegment, Itinerary, Journey } from "../interfaces/search.interface";
+// External imports
 import dayjs from "dayjs";
-import { BookingJourney, BookingRequest, BookingResponse, BookingStatus, ETicket, PaxType, TravelerDetails } from "../interfaces/book.interface";
 import axios from "axios";
+import { randomUUID } from "crypto";
+
+// Internal imports
+import { Config, DEFAULTS, getConfig } from "../configs/config";
+import { AirSegment } from "../interfaces/search.interface";
+import { AllianceBookResponse, AlliancePaymentResponse, BookingRequest, BookingResponse, BookingStatus, ETicket } from "../interfaces/book.interface";
+import { IError } from "../interfaces/common.interface";
 import { saveLogInFile } from "../utils/save-log";
 
 export async function handleBooking(request: BookingRequest) {
@@ -29,19 +33,19 @@ export async function handleBooking(request: BookingRequest) {
                 ...request.journey[0],
             }]
         };
-        if (bookResponse?.error) {
+        if ('error' in bookResponse)
             return { response, error: { message: bookResponse.error.message } };
-        }
+
         defaultStatus.pnrStatus = "Confirmed";
         response.journey[0].recLocInfo = [{
             type: "GDS",
             pnr: bookResponse.book_code
         }];
         const paymentResponse = await processPayment(request, config, bookResponse);
-        if (paymentResponse?.ticket_unit?.length) {
+        if ('ticket_unit' in paymentResponse) {
             defaultStatus.paymentStatus = "Paid";
             const ticketMap: { [key: string]: ETicket[] } = {};
-            paymentResponse?.ticket_unit?.forEach?.((ticket: any) => {
+            paymentResponse?.ticket_unit?.forEach?.((ticket) => {
                 if (!ticketMap[ticket[0]]) ticketMap[ticket[0]] = [];
                 ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] } as ETicket);
             });
@@ -57,21 +61,23 @@ export async function handleBooking(request: BookingRequest) {
     }
 }
 
-export async function processBooking(request: any, config: Config) {
+export async function processBooking(request: BookingRequest, config: Config): Promise<AllianceBookResponse | IError> {
     try {
         const credentials = request.vendorList[0].credential;
-        const journey = request.journey[0] as BookingJourney;
-        const itinerary = journey.itinerary[0] as Itinerary;
-        const travelerDetails = journey.travellerDetails as TravelerDetails[];
+        const journey = request.journey[0];
+        const itinerary = journey.itinerary[0];
+        const travelerDetails = journey.travellerDetails;
 
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
+
         options.append("rqid", credentials.userId);
         options.append("airline_code", DEFAULTS.SUPPLIER_CODE);
         options.append("action", config.endpoints.book);
         options.append("app", "transaction");
         options.append("org", journey.origin);
         options.append("des", journey.destination);
+
         const flightNumberString = getFlightNumbers(itinerary.airSegments as AirSegment[]);
         options.append("dep_flight_no", flightNumberString);
         options.append("dep_date", dayjs(itinerary.airSegments[0].departure.date, "DD/MM/YYYY").format("YYYYMMDD"));
@@ -124,15 +130,15 @@ export async function processBooking(request: any, config: Config) {
         const response = await axios.get(url.toString());
         saveLogInFile("book-res.json", response.data);
         if (response.data.err_code != "0") return { error: response.data?.err_msg || response?.data?.error_message || "Error while processing booking" }
-        return response.data;
+        return response.data as AllianceBookResponse;
     } catch (error: any) {
         console.log({ processBookingError: error });
         return { error: { message: error.message, stack: error.stack } }
     }
 }
-export async function processPayment(request: any, config: Config, bookResponse: any) {
+
+export async function processPayment(request: BookingRequest, config: Config, bookResponse: AllianceBookResponse): Promise<AlliancePaymentResponse | IError> {
     try {
-        const config = await getConfig(request.credentialType);
         const credentials = request.vendorList[0].credential;
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
@@ -145,8 +151,8 @@ export async function processPayment(request: any, config: Config, bookResponse:
         saveLogInFile("payment.req.json", url.toString());
         const response = await axios.get(url.toString());
         saveLogInFile("payment.res.json", response.data);
-        if (response.data.err_code != "0") return { error: response.data?.err_msg || response?.data?.error_message || "Error while processing payment" }
-        return response.data;
+        if (response.data.err_code != "0") return { error: response.data.err_msg || "Error while processing payment" }
+        return response.data as AlliancePaymentResponse;
     } catch (error: any) {
         console.log({ error });
         return { error: { message: error.message, stack: error.stack } }
@@ -154,16 +160,11 @@ export async function processPayment(request: any, config: Config, bookResponse:
 }
 
 export function getFlightNumbers(segments: AirSegment[]) {
-    let flightNumbers: string[] = [];
-    segments.forEach((segment) => {
-        flightNumbers.push(segment.fltNum);
-    });
+    const flightNumbers = segments.map(segment => segment.fltNum);
     return flightNumbers.join(",");
 }
+
 export function getFareBasisCodes(segments: AirSegment[]) {
-    let fareBasisCodes: string[] = [];
-    segments.forEach((segment) => {
-        fareBasisCodes.push(segment.fareBasisCode);
-    });
+    const fareBasisCodes = segments.map(segment => segment.fareBasisCode);
     return fareBasisCodes.join(",");
 }

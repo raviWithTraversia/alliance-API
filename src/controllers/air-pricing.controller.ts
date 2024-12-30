@@ -1,4 +1,7 @@
+// External imports
 import { Request, Response } from "express";
+
+// Internal imports
 import { handleAirPricing } from "../core/air-pricing.core";
 
 export async function airPricingController(req: Request, res: Response) {

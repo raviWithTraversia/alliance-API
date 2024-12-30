@@ -83,3 +83,36 @@ export interface FrequentFlyer {
     ffNumber: string;
     carrier: string;
 }
+
+export interface AllianceBookResponse {
+    ws_access_id: number;
+    access_time: string;
+    elapsed_time: string;
+    err_code: string;
+    org: string;
+    des: string;
+    round_trip: number;
+    book_code: string;
+    dep_date: string;
+    dep_flight_no: string;
+    pax_num: [number, number, number];
+    pax_name: string[];
+    normal_sales: number;
+    book_balance: number;
+    pay_limit: string;
+    status: string;
+    additional_message: string;
+    book_ccy: string;
+}
+
+export interface AlliancePaymentResponse {
+    ws_access_id: number;
+    access_time: string;
+    elapsed_time: string;
+    err_code: string;
+    err_msg?: string;
+    book_code: string;
+    book_balance: number;
+    ccy: string;
+    ticket_unit: [string, string][];
+}

@@ -1,4 +1,7 @@
+// External imports
 import { randomUUID } from "crypto";
+
+// Internal imports
 import { AirPricingRequest, AirPricingResponse } from "../interfaces/air-pricing.interface";
 
 export async function handleAirPricing(request: AirPricingRequest) {

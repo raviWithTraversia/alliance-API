@@ -1,4 +1,7 @@
+// External imports
 import { Request, Response } from "express";
+
+// Internal imports
 import { handleFlightSearch } from "../core/search.core";
 import { SearchRequest } from "../interfaces/search.interface";
 

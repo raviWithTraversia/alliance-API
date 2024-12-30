@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
 
-export function connectionMongoDb(MongoUrl: any): Promise<typeof mongoose> {
-    return mongoose.connect(MongoUrl)
-        .then(() => {
-            console.log(`Successfully connected to MongoDB.--- ${MongoUrl}`);
-            return mongoose;
-        })
-        .catch((error) => {
-            console.error('Error connecting to MongoDB:', error);
-            throw error;
-        });
+export async function initializeMongoDBConnection(URI: string): Promise<typeof mongoose> {
+    try {
+        await mongoose.connect(URI);
+        console.log(`Successfully connected to MongoDB.--- ${URI}`);
+        return mongoose;
+    } catch (error) {
+        console.error(`Error connecting to MongoDB at ${URI}:`, error);
+        throw error;
+    }
 }
+

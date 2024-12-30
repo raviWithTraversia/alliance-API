@@ -1,15 +1,11 @@
-// GLOBAL IMPORTS
+// External imports
 import axios from "axios";
 import dayjs from "dayjs";
 import { randomUUID } from "crypto";
 
-// DEFAULTS IMPORTS
-import { Config, DEFAULTS, getConfig } from "../configs/config"
-
-// INTERFACE IMPORTS
+// Internal imports
+import { Config, DEFAULTS, getConfig } from "../configs/config";
 import { AllianceFlight, AllianceSearchResponse, FareSuccessResponse, Itinerary, Journey, SearchRequest } from "../interfaces/search.interface";
-
-// UTILITY IMPORTS
 import { saveLogInFile } from "../utils/save-log";
 import { getFareInfo } from "../utils/fare-utils";
 import { convertSegment } from "../utils/flight-segment";

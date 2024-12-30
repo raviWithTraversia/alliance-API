@@ -1,5 +1,3 @@
-// src/middleware/errorHandler.ts
-
 import { Request, Response, NextFunction } from 'express';
 import CustomError from '../utils/CustomError';
 import { saveLogInFile } from '../utils/save-log';

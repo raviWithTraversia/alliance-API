@@ -19,15 +19,16 @@ import { PriceBreakupResult } from "../utils/price-breakup";
 // Model imports
 import Airline from "../models/airline.model";
 import Airport from "../models/airport.model";
+import { saveVendorLog } from "../utils/vendor-log";
 
 export async function handleImportPNR(request: ImportPNRRequest, pnr: string): Promise<BookingResponse | IError> {
     try {
         const config = await getConfig(request.credentialType);
         const credentials = request.vendorList[0].credential;
 
-        const bookingResponse = await handleFetchPNRDetails({ config, credentials, pnr });
+        const bookingResponse = await handleFetchPNRDetails({ config, credentials, pnr, request });
         if ('error' in bookingResponse) return bookingResponse;
-        const fareResult = await handleFetchPNRFareDetails({ config, credentials, pnr });
+        const fareResult = await handleFetchPNRFareDetails({ config, credentials, pnr, request });
         if ('error' in fareResult) return fareResult;
         return convertToCommonPNRResponse({ request, result: bookingResponse, fareResult });
     } catch (error: any) {
@@ -36,9 +37,11 @@ export async function handleImportPNR(request: ImportPNRRequest, pnr: string): P
     }
 }
 
-export async function handleFetchPNRDetails({ config, credentials, pnr }
-    : { config: Config, credentials: Credential, pnr: string })
+export async function handleFetchPNRDetails({ config, credentials, pnr, request }
+    : { config: Config, credentials: Credential, pnr: string, request: ImportPNRRequest })
     : Promise<PNRRetrieveResponse | IError> {
+    let vendorRequest: any = null;
+    let vendorResponse: any = null;
     try {
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
@@ -51,19 +54,41 @@ export async function handleFetchPNRDetails({ config, credentials, pnr }
 
         url.search = options.toString();
         saveLogInFile("pnr-retrieve.req.json", url.toString());
+        vendorRequest = url.toString();
         const response = await axios.get(url.toString());
+        vendorResponse = response.data;
         saveLogInFile("pnr-retrieve.res.json", response.data);
         if (response.data.err_code != "0") return { error: { message: response.data.err_msg } };
         return response.data as PNRRetrieveResponse;
     } catch (error: any) {
-        console.log({ errorFetchingPNRDetails: error });
-        return { error: { message: error.message, stack: error.stack } };
+        console.log({ importPNRError: error });
+        const errorResponse: IError = { error: { message: error.message, stack: error.stack } };
+        vendorResponse = { ...(vendorResponse && { vendorResponse }), ...errorResponse };
+        return errorResponse;
+    } finally {
+        request.uniqueKey = request.uniqueKey || randomUUID();
+        request.traceId = request.traceId || randomUUID();
+        saveVendorLog({
+            uniqueKey: request.uniqueKey,
+            traceId: request.traceId,
+            serviceName: "import_pnr",
+            systemName: config.endpoints.retrieve_booking || "",
+            systemEntity: request?.systemEntity || "",
+            vendorCode: "9I",
+            vendorRequest,
+            requestDateTimeStamp: new Date(),
+            vendorResponse,
+            responseDateTimeStamp: new Date(),
+            status: vendorResponse?.error ? "failure" : "success",
+        });
     }
 }
 
-export async function handleFetchPNRFareDetails({ config, credentials, pnr }
-    : { config: Config, credentials: Credential, pnr: string })
+export async function handleFetchPNRFareDetails({ config, credentials, pnr, request }
+    : { config: Config, credentials: Credential, pnr: string, request: ImportPNRRequest })
     : Promise<PNRFareRetrieveResponse | IError> {
+    let vendorRequest: any = null;
+    let vendorResponse: any = null;
     try {
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
@@ -76,13 +101,31 @@ export async function handleFetchPNRFareDetails({ config, credentials, pnr }
 
         url.search = options.toString();
         saveLogInFile("pnr-fare-retrieve.req.json", url.toString());
+        vendorRequest = url.toString();
         const response = await axios.get(url.toString());
+        vendorResponse = response.data;
         saveLogInFile("pnr-fare-retrieve.res.json", response.data);
         if (response.data.err_code != "0") return { error: { message: response.data.err_msg } };
         return response.data as PNRFareRetrieveResponse;
     } catch (error: any) {
-        console.log({ errorFetchingPNRFareDetails: error });
-        return { error: { message: error.message, stack: error.stack } }
+        console.log({ fetchPNRFareError: error });
+        const errorResponse: IError = { error: { message: error.message, stack: error.stack } };
+        vendorResponse = { ...(vendorResponse && { vendorResponse }), ...errorResponse };
+        return errorResponse;
+    } finally {
+        saveVendorLog({
+            uniqueKey: request.uniqueKey,
+            traceId: request.traceId,
+            serviceName: "import_pnr",
+            systemName: config.endpoints.retrieve_pnr_fare || "",
+            systemEntity: request?.systemEntity || "",
+            vendorCode: "9I",
+            vendorRequest,
+            requestDateTimeStamp: new Date(),
+            vendorResponse,
+            responseDateTimeStamp: new Date(),
+            status: vendorResponse?.error ? "failure" : "success",
+        });
     }
 }
 
@@ -122,10 +165,10 @@ export async function convertToCommonPNRResponse({ request, result, fareResult }
                     baseFare: fare.baseFare,
                     taxes: fare.taxes,
                     totalPrice: fare.totalPrice,
-                    currency: "",
+                    currency: result.book_ccy,
                     provider: "9I",
                     promoCodeType: "",
-                    valCarrier: "",
+                    valCarrier: "9I",
                     fareFamily: "Regular Fare",
                     airSegments,
                     priceBreakup: fare.priceBreakup,

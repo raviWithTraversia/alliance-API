@@ -4,6 +4,11 @@ export interface ImportPNRRequest {
     typeOfTrip: TypeOfTrip;
     credentialType: CredentialType;
     travelType: TravelType;
+    systemEntity?: string;
+    systemName?: string;
+    corpCode?: string;
+    requestorCode?: string;
+    empCode?: string;
     uniqueKey: string;
     traceId: string;
     vendorList: Vendor[];

@@ -12,6 +12,7 @@ import { convertSegment } from "../utils/flight-segment";
 import { getPriceBreakup, Pax, PriceBreakupResult } from "../utils/price-breakup";
 import { IError } from "../interfaces/common.interface";
 import { AirPricingRequest } from "../interfaces/air-pricing.interface";
+import { saveVendorLog } from "../utils/vendor-log";
 
 /**
  * Handles the flight search request by constructing the search URL with the provided request parameters,
@@ -23,11 +24,13 @@ import { AirPricingRequest } from "../interfaces/air-pricing.interface";
  * @throws {Error} - Throws an error if the search request fails.
  */
 export async function handleFlightSearch(request: SearchRequest): Promise<SearchResponse | IError> {
+    let vendorRequest: any = null;
+    let vendorResponse: any = null;
+    const config = await getConfig(request.credentialType);
     try {
         if (request.sectors[0].cabinClass !== "Economy")
             return { error: { message: "Only Economy class is supported" } };
 
-        const config = await getConfig(request.credentialType);
 
         const origin = request.sectors[0].origin;
         const destination = request.sectors[0].destination;
@@ -51,24 +54,45 @@ export async function handleFlightSearch(request: SearchRequest): Promise<Search
         //     options.append("ret_flight_date", returnDate);
         // }
         url.search = options.toString();
+        vendorRequest = url.toString();
         console.log({ searchEndpoint: url.toString() });
 
         saveLogInFile("search-req.json", url.toString());
         const response = await axios.get(url.toString());
+        vendorResponse = response.data;
         saveLogInFile("search-response.json", response.data);
 
         const result = response.data as AllianceSearchResponse;
         if (result?.err_code == "0")
-            return convertCommonSearchResponse({ result, request, searchURL: url, searchOptions: options, config });
-        return { error: { message: result.err_message || "Unknown search error" } };
+            return convertCommonSearchResponse({ result, request, config });
+        return { error: { message: result.err_msg || result.err_message || "Unknown search error" } };
     } catch (error: any) {
-        return { error: { message: error.message, stack: error.stack } }
+        console.log({ searchError: error });
+        const errorResponse: IError = { error: { message: error.message, stack: error.stack } };
+        vendorResponse = { ...(vendorResponse && { vendorResponse }), ...errorResponse };
+        return errorResponse;
+    } finally {
+        request.traceId = randomUUID();
+        request.uniqueKey = request.uniqueKey || randomUUID();
+        saveVendorLog({
+            uniqueKey: request.uniqueKey || randomUUID(),
+            traceId: request.traceId,
+            serviceName: "search",
+            systemName: config.endpoints.search || "",
+            systemEntity: request?.systemEntity || "",
+            vendorCode: "9I",
+            vendorRequest,
+            requestDateTimeStamp: new Date(),
+            vendorResponse,
+            responseDateTimeStamp: new Date(),
+            status: vendorResponse?.error ? "failure" : "success",
+        });
     }
 }
 
 export async function convertCommonSearchResponse(
-    { result, request, searchURL, searchOptions, config }:
-        { result: AllianceSearchResponse, request: SearchRequest, searchURL: URL, searchOptions: URLSearchParams, config: Config }): Promise<SearchResponse | IError> {
+    { result, request, config }:
+        { result: AllianceSearchResponse, request: SearchRequest, config: Config }): Promise<SearchResponse | IError> {
     const commonResponse: SearchResponse = {
         uniqueKey: request.uniqueKey || randomUUID(),
         traceId: randomUUID(),
@@ -92,7 +116,7 @@ export async function convertCommonSearchResponse(
                         idx += itineraries?.length;
                     }
                 } catch (error: any) {
-                    console.log({ error })
+                    console.log({ error });
                 }
             }
         }
@@ -109,8 +133,10 @@ export async function retrieveFareFromItinerary(
             config: Config, index: number, request: SearchRequest | AirPricingRequest
         }): Promise<Itinerary[] | PriceBreakupResult | IError> {
 
-    const sectors = (Array.isArray(flight?.[0]) ? flight : [flight]) as AllianceFlight[];
+    let vendorRequest: any = null;
+    let vendorResponse: any = null;
     try {
+        const sectors = (Array.isArray(flight?.[0]) ? flight : [flight]) as AllianceFlight[];
         const flightNumbers: string[] = sectors.map((sector) => {
             const [_provider, flightNumber] = sector?.[0]?.split?.("-") || [];
             return flightNumber;
@@ -133,7 +159,9 @@ export async function retrieveFareFromItinerary(
         url.search = options.toString();
 
         saveLogInFile("fare-details-request.json", { url: url.toString() } as any);
+        vendorRequest = url.toString();
         const fareDetailsResponse = await axios.get(url.toString());
+        vendorResponse = fareDetailsResponse.data;
         saveLogInFile("fare-details-response.json", { url: url.toString(), data: fareDetailsResponse.data } as any);
 
         const result = fareDetailsResponse.data;
@@ -142,8 +170,24 @@ export async function retrieveFareFromItinerary(
         if ('journey' in request) return updatedFareDetails({ result, request });
         return convertItinerary({ request, sectors, fareResponse: result, index });
     } catch (error: any) {
-        console.log({ errorRetrievingFare: error });
-        return { error: { message: error.message, stack: error.stack } }
+        console.log({ searchError: error });
+        const errorResponse: IError = { error: { message: error.message, stack: error.stack } };
+        vendorResponse = { ...(vendorResponse && { vendorResponse }), ...errorResponse };
+        return errorResponse;
+    } finally {
+        saveVendorLog({
+            uniqueKey: request.uniqueKey,
+            traceId: request.traceId,
+            serviceName: 'journey' in request ? "air_pricing" : "search",
+            systemName: config.endpoints.fare || "",
+            systemEntity: request?.systemEntity || "",
+            vendorCode: "9I",
+            vendorRequest,
+            requestDateTimeStamp: new Date(),
+            vendorResponse,
+            responseDateTimeStamp: new Date(),
+            status: vendorResponse?.error ? "failure" : "success",
+        });
     }
 }
 

@@ -54,6 +54,7 @@ export interface SearchRequest {
     requestorCode: string;
     empCode: string;
     uniqueKey: string;
+    traceId?: string;
     version: string;
     sectors: Sector[];
     paxDetail: PaxDetail;
@@ -77,6 +78,7 @@ export interface AllianceSearchResponse {
     elapsed_time: string;
     err_code: string;
     err_message?: string;
+    err_msg?: string;
     org: string;
     des: string;
     flight_date: string;

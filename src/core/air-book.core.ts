@@ -11,6 +11,7 @@ import { IError } from "../interfaces/common.interface";
 import { saveLogInFile } from "../utils/save-log";
 import { handleImportPNR } from "./import-pnr.core";
 import { ImportPNRRequest } from "../interfaces/import-pnr.interfaces";
+import { saveVendorLog } from "../utils/vendor-log";
 
 export async function handleBooking(request: BookingRequest): Promise<BookingErrorResponse | BookingResponse> {
     const status: BookingStatus = {
@@ -63,6 +64,10 @@ export async function handleBooking(request: BookingRequest): Promise<BookingErr
             typeOfTrip: request.typeOfTrip,
             credentialType: request.credentialType,
             travelType: request.travelType,
+            systemEntity: request.systemEntity,
+            systemName: request.systemName,
+            corpCode: request.corpCode,
+            requestorCode: request.requestorCode,
             uniqueKey: request.uniqueKey,
             traceId: request.traceId,
             vendorList: request.vendorList,
@@ -86,12 +91,16 @@ export async function handleBooking(request: BookingRequest): Promise<BookingErr
 
 const salutations: any = {
     MR: "MSTR",
+    MSTR: "MSTR",
     MRS: "MISS",
     MISS: "MISS",
     MS: "MISS"
 };
 
 export async function processBooking(request: BookingRequest, config: Config): Promise<AllianceBookResponse | IError> {
+    let vendorRequest: any = null;
+    let vendorResponse: any = null;
+
     try {
         const credentials = request.vendorList[0].credential;
         const journey = request.journey[0];
@@ -168,20 +177,42 @@ export async function processBooking(request: BookingRequest, config: Config): P
             options.append(`i_parent_${i}`, parentIDX.toString());
         }
         url.search = options.toString();
+        vendorRequest = url.toString();
         saveLogInFile("book-req.json", url.toString());
         const response = await axios.get(url.toString());
-
+        vendorResponse = response.data;
         saveLogInFile("book-res.json", response.data);
         if (response.data.err_code != "0")
             return { error: { message: response.data?.err_msg || "Error while processing booking" } }
         return response.data as AllianceBookResponse;
     } catch (error: any) {
-        console.log({ processBookingError: error });
-        return { error: { message: error.message } }
+        console.log({ bookingError: error });
+        const errorResponse: IError = { error: { message: error.message, stack: error.stack } };
+        vendorResponse = { ...(vendorResponse && { vendorResponse }), ...errorResponse };
+        return errorResponse;
+    } finally {
+        request.uniqueKey = request.uniqueKey || randomUUID();
+        request.traceId = request.traceId || randomUUID();
+        saveVendorLog({
+            uniqueKey: request.uniqueKey,
+            traceId: request.traceId,
+            serviceName: "air_booking",
+            systemName: config.endpoints.book || "",
+            systemEntity: request?.systemEntity || "",
+            vendorCode: "9I",
+            vendorRequest,
+            requestDateTimeStamp: new Date(),
+            vendorResponse,
+            responseDateTimeStamp: new Date(),
+            status: vendorResponse?.error ? "failure" : "success",
+        });
     }
 }
 
 export async function processPayment(request: BookingRequest, config: Config, bookResponse: AllianceBookResponse): Promise<AlliancePaymentResponse | IError> {
+    let vendorRequest: any = null;
+    let vendorResponse: any = null;
+
     try {
         const credentials = request.vendorList[0].credential;
         const url = new URL(config.BASE_URL);
@@ -194,13 +225,31 @@ export async function processPayment(request: BookingRequest, config: Config, bo
         // options.append("amount", request.journey[0].itinerary[0].totalPrice.toString());
         url.search = options.toString();
         saveLogInFile("payment.req.json", url.toString());
+        vendorRequest = url.toString();
         const response = await axios.get(url.toString());
+        vendorResponse = response.data;
         saveLogInFile("payment.res.json", response.data);
         if (response.data.err_code != "0") return { error: { message: response.data.err_msg || "Error while processing payment" } }
         return response.data as AlliancePaymentResponse;
     } catch (error: any) {
-        console.log({ error });
-        return { error: { message: error.message } }
+        console.log({ paymentError: error });
+        const errorResponse: IError = { error: { message: error.message, stack: error.stack } };
+        vendorResponse = { ...(vendorResponse && { vendorResponse }), ...errorResponse };
+        return errorResponse;
+    } finally {
+        saveVendorLog({
+            uniqueKey: request.uniqueKey,
+            traceId: request.traceId,
+            serviceName: "air_booking",
+            systemName: config.endpoints.payment || "",
+            systemEntity: request?.systemEntity || "",
+            vendorCode: "9I",
+            vendorRequest,
+            requestDateTimeStamp: new Date(),
+            vendorResponse,
+            responseDateTimeStamp: new Date(),
+            status: vendorResponse?.error ? "failure" : "success",
+        });
     }
 }
 

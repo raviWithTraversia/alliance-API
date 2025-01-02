@@ -65,6 +65,12 @@ export interface SearchRequest {
     vendorList: Vendor[];
 }
 
+export interface SearchResponse {
+    uniqueKey: string;
+    traceId: string;
+    journey: Journey[]
+}
+
 export interface AllianceSearchResponse {
     ws_access_id: number;
     access_time: string;
@@ -182,7 +188,7 @@ export type AllianceFlight = [
     string, // arrivalTime
     string, // duration
     string, // aircraft
-    number, // transit
+    string, // transit
     [string, string][], // availability
     string, // key
     string, // travelDetails

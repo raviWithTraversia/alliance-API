@@ -5,11 +5,13 @@ import { randomUUID } from "crypto";
 
 // Internal imports
 import { Config, DEFAULTS, getConfig } from "../configs/config";
-import { AllianceFlight, AllianceSearchResponse, FareSuccessResponse, Itinerary, Journey, SearchRequest } from "../interfaces/search.interface";
+import { AllianceFlight, AllianceSearchResponse, Credential, FareSuccessResponse, Itinerary, Journey, SearchRequest, SearchResponse } from "../interfaces/search.interface";
 import { saveLogInFile } from "../utils/save-log";
 import { getFareInfo } from "../utils/fare-utils";
 import { convertSegment } from "../utils/flight-segment";
-import { getPriceBreakup, Pax } from "../utils/price-breakup";
+import { getPriceBreakup, Pax, PriceBreakupResult } from "../utils/price-breakup";
+import { IError } from "../interfaces/common.interface";
+import { AirPricingRequest } from "../interfaces/air-pricing.interface";
 
 /**
  * Handles the flight search request by constructing the search URL with the provided request parameters,
@@ -20,15 +22,18 @@ import { getPriceBreakup, Pax } from "../utils/price-breakup";
  *
  * @throws {Error} - Throws an error if the search request fails.
  */
-export async function handleFlightSearch(request: SearchRequest) {
+export async function handleFlightSearch(request: SearchRequest): Promise<SearchResponse | IError> {
     try {
+        if (request.sectors[0].cabinClass !== "Economy")
+            return { error: { message: "Only Economy class is supported" } };
+
         const config = await getConfig(request.credentialType);
 
         const origin = request.sectors[0].origin;
         const destination = request.sectors[0].destination;
         const credentials = request.vendorList[0].credential;
         const departureDate = dayjs(request.sectors[0].departureDate, "DD-MM-YYYY").format("YYYYMMDD");
-        const returnFlight = request.typeOfTrip === "ROUNDTRIP" && request.travelType === "INT" ? 1 : 0;
+        // const returnFlight = request.typeOfTrip === "ROUNDTRIP" && request.travelType === "INT" ? 1 : 0;
 
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
@@ -40,14 +45,15 @@ export async function handleFlightSearch(request: SearchRequest) {
         options.append("org", origin);
         options.append("des", destination);
         options.append("flight_date", departureDate);
-        options.append("return_flight", returnFlight.toString());
-        if (returnFlight) {
-            const returnDate = dayjs(request.sectors[1].departureDate, "DD-MM-YYYY").format("YYYYMMDD");
-            options.append("ret_flight_date", returnDate);
-        }
+        // options.append("return_flight", returnFlight.toString());
+        // if (returnFlight) {
+        //     const returnDate = dayjs(request.sectors[1].departureDate, "DD-MM-YYYY").format("YYYYMMDD");
+        //     options.append("ret_flight_date", returnDate);
+        // }
         url.search = options.toString();
         console.log({ searchEndpoint: url.toString() });
 
+        saveLogInFile("search-req.json", url.toString());
         const response = await axios.get(url.toString());
         saveLogInFile("search-response.json", response.data);
 
@@ -56,14 +62,14 @@ export async function handleFlightSearch(request: SearchRequest) {
             return convertCommonSearchResponse({ result, request, searchURL: url, searchOptions: options, config });
         return { error: { message: result.err_message || "Unknown search error" } };
     } catch (error: any) {
-        return { error: { stack: error.stack, message: error.message } }
+        return { error: { message: error.message, stack: error.stack } }
     }
 }
 
 export async function convertCommonSearchResponse(
     { result, request, searchURL, searchOptions, config }:
-        { result: AllianceSearchResponse, request: SearchRequest, searchURL: URL, searchOptions: URLSearchParams, config: Config }) {
-    const commonResponse = {
+        { result: AllianceSearchResponse, request: SearchRequest, searchURL: URL, searchOptions: URLSearchParams, config: Config }): Promise<SearchResponse | IError> {
+    const commonResponse: SearchResponse = {
         uniqueKey: request.uniqueKey || randomUUID(),
         traceId: randomUUID(),
         journey: [{
@@ -78,8 +84,10 @@ export async function convertCommonSearchResponse(
         for (let schedule of result.schedule) {
             for (let flight of schedule) {
                 try {
-                    const itineraries: false | Itinerary[] = await retrieveFareFromItinerary({ flight, url: searchURL, options: searchOptions, config, index: idx, request });
-                    if (itineraries && itineraries?.length) {
+                    const itineraries = await retrieveFareFromItinerary({
+                        flight, config, index: idx, request
+                    });
+                    if (itineraries && 'length' in itineraries && itineraries.length) {
                         commonResponse.journey[0].itinerary.push(...itineraries);
                         idx += itineraries?.length;
                     }
@@ -89,20 +97,17 @@ export async function convertCommonSearchResponse(
             }
         }
     } catch (error: any) {
-        return {
-            error: {
-                stack: error.stack,
-                message: error.message
-            }
-        }
+        return { error: { message: error.message, stack: error.stack } }
     }
     return commonResponse;
-    // return { commonResponse, result };
 }
 
 export async function retrieveFareFromItinerary(
-    { flight, url, options, config, index, request }
-        : { flight: AllianceFlight | AllianceFlight[], url: URL, options: URLSearchParams, config: Config, index: number, request: SearchRequest }) {
+    { flight, config, index, request }
+        : {
+            flight: AllianceFlight | AllianceFlight[],
+            config: Config, index: number, request: SearchRequest | AirPricingRequest
+        }): Promise<Itinerary[] | PriceBreakupResult | IError> {
 
     const sectors = (Array.isArray(flight?.[0]) ? flight : [flight]) as AllianceFlight[];
     try {
@@ -111,29 +116,40 @@ export async function retrieveFareFromItinerary(
             return flightNumber;
         });
         if (!flightNumbers.length) throw new Error("No flight numbers found");
+        const credentials = request.vendorList[0].credential;
+        const url = new URL(config.BASE_URL);
+        const options = new URLSearchParams();
+        const departureDate = sectors[0][3];
 
+        options.append("rqid", credentials.userId);
+        options.append("airline_code", DEFAULTS.SUPPLIER_CODE);
         options.set("action", config.endpoints.fare);
+        options.append("app", "information");
+        options.append("org", sectors[0][1]);
+        options.append("des", sectors.length > 1 ? sectors[1][2] : sectors[0][2]);
         options.set("flight_no", flightNumbers.join(","));
-        // options.delete("return_flight");
-        // options.delete("return_flight_date");
+        options.append("flight_date", departureDate);
+
         url.search = options.toString();
 
+        saveLogInFile("fare-details-request.json", { url: url.toString() } as any);
         const fareDetailsResponse = await axios.get(url.toString());
         saveLogInFile("fare-details-response.json", { url: url.toString(), data: fareDetailsResponse.data } as any);
 
         const result = fareDetailsResponse.data;
-        if (result?.err_msg) throw new Error(result?.err_msg);
+        if ('err_msg' in result) return { error: { message: result.err_msg } }
 
-        return convertItinerary({ request, sectors, fareResponse: result as FareSuccessResponse, index });
-    } catch (errorRetrievingFare: any) {
-        console.log({ errorRetrievingFare });
+        if ('journey' in request) return updatedFareDetails({ result, request });
+        return convertItinerary({ request, sectors, fareResponse: result, index });
+    } catch (error: any) {
+        console.log({ errorRetrievingFare: error });
+        return { error: { message: error.message, stack: error.stack } }
     }
-    return false;
 }
 
 export async function convertItinerary(
     { request, sectors, fareResponse, index }
-        : { request: SearchRequest, sectors: AllianceFlight[], fareResponse: FareSuccessResponse, index: number }) {
+        : { request: SearchRequest, sectors: AllianceFlight[], fareResponse: FareSuccessResponse, index: number }): Promise<Itinerary[] | IError> {
     try {
         const fares = getFareInfo(fareResponse);
         saveLogInFile("fare-info.json", fares as any);
@@ -191,8 +207,43 @@ export async function convertItinerary(
         }
         saveLogInFile("itineraries.json", itineraries as any);
         return itineraries;
-    } catch (errorConvertingItinerary: any) {
-        console.log({ errorConvertingItinerary });
+    } catch (error: any) {
+        console.log({ errorConvertingItinerary: error });
+        return { error: { message: error.message, stack: error.stack } }
     }
-    return false;
+}
+
+export function updatedFareDetails({ result, request }: { result: FareSuccessResponse, request: AirPricingRequest }): PriceBreakupResult | IError {
+    console.log("fetching updated fare details");
+    try {
+        const fares = getFareInfo(result);
+        const paxList: Pax[] = [
+            {
+                type: "ADT",
+                count: 0,
+                key: "adult"
+            },
+            {
+                type: "CHD",
+                count: 0,
+                key: "child"
+            },
+            {
+                type: "INF",
+                count: 0,
+                key: "infant"
+            },
+        ];
+        request.journey[0].itinerary[0].priceBreakup.forEach((breakup) => {
+            if (breakup.passengerType === "ADT") paxList[0].count += Number(breakup.noOfPassenger);
+            if (breakup.passengerType === "CHD") paxList[1].count += Number(breakup.noOfPassenger);
+            if (breakup.passengerType === "INF") paxList[2].count += Number(breakup.noOfPassenger);
+        });
+        const fare = fares.find((fare) => fare.fareBasis === request.journey[0].itinerary[0].airSegments[0].fareBasisCode);
+        if (!fare) throw new Error("Fare not found");
+        return getPriceBreakup(fare, paxList);
+    } catch (error: any) {
+        console.log({ errorConvertingFare: error });
+        return { error: { message: error.message, stack: error.stack } }
+    }
 }

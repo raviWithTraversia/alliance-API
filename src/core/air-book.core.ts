@@ -6,33 +6,35 @@ import { randomUUID } from "crypto";
 // Internal imports
 import { Config, DEFAULTS, getConfig } from "../configs/config";
 import { AirSegment } from "../interfaces/search.interface";
-import { AllianceBookResponse, AlliancePaymentResponse, BookingRequest, BookingResponse, BookingStatus, ETicket } from "../interfaces/book.interface";
+import { AllianceBookResponse, AlliancePaymentResponse, BookingErrorResponse, BookingRequest, BookingResponse, BookingStatus, ETicket } from "../interfaces/book.interface";
 import { IError } from "../interfaces/common.interface";
 import { saveLogInFile } from "../utils/save-log";
 
-export async function handleBooking(request: BookingRequest) {
+
+export async function handleBooking(request: BookingRequest): Promise<BookingErrorResponse | BookingResponse> {
+    const defaultStatus: BookingStatus = {
+        pnrStatus: "Failed",
+        paymentStatus: "Unpaid"
+    };
+    const fieldsBeforeStatus = {
+        journeyKey: "",
+        origin: "",
+        destination: "",
+    };
+    const response: BookingResponse = {
+        uniqueKey: request.uniqueKey || randomUUID(),
+        traceId: request.traceId || randomUUID(),
+        journey: [{
+            ...fieldsBeforeStatus,
+            status: defaultStatus,
+            recLocInfo: null,
+            ...request.journey[0],
+        }]
+    };
     try {
         const config = await getConfig(request.credentialType);
         const bookResponse = await processBooking(request, config);
-        const defaultStatus: BookingStatus = {
-            pnrStatus: "Failed",
-            paymentStatus: "Unpaid"
-        };
-        const fieldsBeforeStatus = {
-            journeyKey: "",
-            origin: "",
-            destination: "",
-        };
-        const response: BookingResponse = {
-            uniqueKey: request.uniqueKey || randomUUID(),
-            traceId: request.traceId || randomUUID(),
-            journey: [{
-                ...fieldsBeforeStatus,
-                status: defaultStatus,
-                recLocInfo: null,
-                ...request.journey[0],
-            }]
-        };
+
         if ('error' in bookResponse)
             return { response, error: { message: bookResponse.error.message } };
 
@@ -57,9 +59,16 @@ export async function handleBooking(request: BookingRequest) {
         return response;
     } catch (bookError: any) {
         console.log({ bookError });
-        return { error: { message: bookError.message, stack: bookError.stack } }
+        return { error: { message: bookError.message }, response }
     }
 }
+
+const salutations: any = {
+    MR: "MSTR",
+    MRS: "MISS",
+    MISS: "MISS",
+    MS: "MISS"
+};
 
 export async function processBooking(request: BookingRequest, config: Config): Promise<AllianceBookResponse | IError> {
     try {
@@ -90,18 +99,22 @@ export async function processBooking(request: BookingRequest, config: Config): P
             INF: 0
         };
         const parents = [];
-        travelerDetails.forEach((traveler, idx) => {
-            const paxIdx = idx + 1;
+        travelerDetails.forEach((traveler) => {
+            counts[traveler.type] += 1;
+            const paxIdx = counts[traveler.type];
             const typeKey = traveler.type.charAt(0).toLowerCase();
             if (traveler.type === "ADT") parents.push(traveler);
-            if (paxIdx === 1) {
+            if (paxIdx === 1 && traveler.type === "ADT") {
                 options.append(`contact_${paxIdx}`, traveler.firstName || "");
                 options.append(`email`, traveler.contactDetails?.email || "");
             }
-            counts[traveler.type] += 1;
             options.append(`${typeKey}_first_name_${paxIdx}`, traveler.firstName);
             options.append(`${typeKey}_last_name_${paxIdx}`, traveler.lastName);
-            options.append(`${typeKey}_salutation_${paxIdx}`, traveler.title.toUpperCase());
+            let salutation = traveler.title.toUpperCase();
+            if (traveler.type !== "ADT") {
+                salutation = salutations[salutation] || "MSTR";
+            }
+            options.append(`${typeKey}_salutation_${paxIdx}`, salutation);
             options.append(`${typeKey}_title_${paxIdx}`, traveler.title.toUpperCase());
             if (traveler.dob)
                 options.append(`${typeKey}_birthdate_${paxIdx}`, dayjs(traveler.dob, "YYYY-MM-DD").format("YYYYMMDD"))
@@ -128,12 +141,14 @@ export async function processBooking(request: BookingRequest, config: Config): P
         url.search = options.toString();
         saveLogInFile("book-req.json", url.toString());
         const response = await axios.get(url.toString());
+
         saveLogInFile("book-res.json", response.data);
-        if (response.data.err_code != "0") return { error: response.data?.err_msg || response?.data?.error_message || "Error while processing booking" }
+        if (response.data.err_code != "0")
+            return { error: { message: response.data?.err_msg || "Error while processing booking" } }
         return response.data as AllianceBookResponse;
     } catch (error: any) {
         console.log({ processBookingError: error });
-        return { error: { message: error.message, stack: error.stack } }
+        return { error: { message: error.message } }
     }
 }
 
@@ -151,11 +166,11 @@ export async function processPayment(request: BookingRequest, config: Config, bo
         saveLogInFile("payment.req.json", url.toString());
         const response = await axios.get(url.toString());
         saveLogInFile("payment.res.json", response.data);
-        if (response.data.err_code != "0") return { error: response.data.err_msg || "Error while processing payment" }
+        if (response.data.err_code != "0") return { error: { message: response.data.err_msg || "Error while processing payment" } }
         return response.data as AlliancePaymentResponse;
     } catch (error: any) {
         console.log({ error });
-        return { error: { message: error.message, stack: error.stack } }
+        return { error: { message: error.message } }
     }
 }
 

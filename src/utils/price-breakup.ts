@@ -19,7 +19,14 @@ export interface Pax {
  *
  * @throws Will throw an error if the fare for a passenger type is not found.
  */
-export function getPriceBreakup(fare: FareInfo, paxList: Pax[]) {
+
+export interface PriceBreakupResult {
+    priceBreakup: PriceBreakup[];
+    totalPrice: number;
+    taxes: number;
+    baseFare: number;
+}
+export function getPriceBreakup(fare: FareInfo, paxList: Pax[]): PriceBreakupResult {
     let totalPrice = 0;
     let baseFare = 0;
     let taxes = 0;

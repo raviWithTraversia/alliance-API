@@ -1,10 +1,12 @@
+import { IError } from "./common.interface";
 import { CredentialType, Journey, TravelType, TypeOfTrip, Vendor } from "./search.interface";
 
 export type PaxType = ["ADT", "CHD", "INF"];
-export interface BookingJourney extends Journey {
+
+export interface BookingRequestJourney extends Journey {
     travellerDetails: TravelerDetails[]
 }
-export interface BookingResponseJourney extends BookingJourney {
+export interface BookingResponseJourney extends BookingRequestJourney {
     status: BookingStatus;
     recLocInfo: null | RecordLocator[];
 }
@@ -31,7 +33,7 @@ export interface BookingRequest {
     uniqueKey: string;
     traceId: string;
     vendorList: Vendor[];
-    journey: BookingJourney[];
+    journey: BookingRequestJourney[];
 }
 export interface BookingResponse {
     uniqueKey: string;
@@ -115,4 +117,8 @@ export interface AlliancePaymentResponse {
     book_balance: number;
     ccy: string;
     ticket_unit: [string, string][];
+}
+
+export interface BookingErrorResponse extends IError {
+    response: BookingResponse
 }

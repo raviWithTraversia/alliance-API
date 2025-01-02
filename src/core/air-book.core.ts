@@ -9,9 +9,11 @@ import { AirSegment } from "../interfaces/search.interface";
 import { AllianceBookResponse, AlliancePaymentResponse, BookingErrorResponse, BookingRequest, BookingResponse, BookingStatus, ETicket } from "../interfaces/book.interface";
 import { IError } from "../interfaces/common.interface";
 import { saveLogInFile } from "../utils/save-log";
+import { handleImportPNR } from "./import-pnr.core";
+import { ImportPNRRequest } from "../interfaces/import-pnr.interfaces";
 
 export async function handleBooking(request: BookingRequest): Promise<BookingErrorResponse | BookingResponse> {
-    const defaultStatus: BookingStatus = {
+    const status: BookingStatus = {
         pnrStatus: "Failed",
         paymentStatus: "Unpaid"
     };
@@ -25,7 +27,7 @@ export async function handleBooking(request: BookingRequest): Promise<BookingErr
         traceId: request.traceId || randomUUID(),
         journey: [{
             ...fieldsBeforeStatus,
-            status: defaultStatus,
+            status,
             recLocInfo: null,
             ...request.journey[0],
         }]
@@ -37,25 +39,45 @@ export async function handleBooking(request: BookingRequest): Promise<BookingErr
         if ('error' in bookResponse)
             return { response, error: { message: bookResponse.error.message } };
 
-        defaultStatus.pnrStatus = "Confirmed";
+        status.pnrStatus = "Confirmed";
         response.journey[0].recLocInfo = [{
             type: "GDS",
             pnr: bookResponse.book_code
         }];
-        const paymentResponse = await processPayment(request, config, bookResponse);
-        if ('ticket_unit' in paymentResponse) {
-            defaultStatus.paymentStatus = "Paid";
-            const ticketMap: { [key: string]: ETicket[] } = {};
-            paymentResponse?.ticket_unit?.forEach?.((ticket) => {
-                if (!ticketMap[ticket[0]]) ticketMap[ticket[0]] = [];
-                ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] } as ETicket);
-            });
-            response.journey[0].travellerDetails.forEach((traveler) => {
-                const fullName = `${traveler.firstName} ${traveler.lastName}`.toUpperCase();
-                traveler.eTicket = ticketMap[fullName] || null;
-            })
+        if (request.isHoldBooking == false) {
+            const paymentResponse = await processPayment(request, config, bookResponse);
+            if ('ticket_unit' in paymentResponse) {
+                status.paymentStatus = "Paid";
+                const ticketMap: { [key: string]: ETicket[] } = {};
+                paymentResponse?.ticket_unit?.forEach?.((ticket) => {
+                    if (!ticketMap[ticket[0]]) ticketMap[ticket[0]] = [];
+                    ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] } as ETicket);
+                });
+                response.journey[0].travellerDetails.forEach((traveler) => {
+                    const fullName = `${traveler.firstName} ${traveler.lastName}`.toUpperCase();
+                    traveler.eTicket = ticketMap[fullName] || null;
+                })
+            }
         }
-        return response;
+        const importPNRRequest: ImportPNRRequest = {
+            typeOfTrip: request.typeOfTrip,
+            credentialType: request.credentialType,
+            travelType: request.travelType,
+            uniqueKey: request.uniqueKey,
+            traceId: request.traceId,
+            vendorList: request.vendorList,
+            journey: [{
+                uid: randomUUID(),
+                origin: request.journey[0].origin,
+                destination: request.journey[0].destination,
+                itinerary: [{
+                    recordLocator: bookResponse.book_code
+                }]
+            }]
+        }
+        const pnrResponse = await handleImportPNR(importPNRRequest, bookResponse.book_code);
+        if ('error' in pnrResponse) return { response, error: pnrResponse.error };
+        return pnrResponse;
     } catch (bookError: any) {
         console.log({ bookError });
         return { error: { message: bookError.message }, response }

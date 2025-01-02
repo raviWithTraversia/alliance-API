@@ -35,6 +35,7 @@ export interface BookingRequest {
     vendorList: Vendor[];
     journey: BookingRequestJourney[];
     gstDetails?: GSTDetails | null;
+    isHoldBooking: boolean;
 }
 export interface BookingResponse {
     uniqueKey: string;

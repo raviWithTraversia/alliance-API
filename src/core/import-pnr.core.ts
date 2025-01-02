@@ -20,7 +20,7 @@ import { PriceBreakupResult } from "../utils/price-breakup";
 import Airline from "../models/airline.model";
 import Airport from "../models/airport.model";
 
-export async function handleImportPNR(request: ImportPNRRequest, pnr: string): Promise<any | IError> {
+export async function handleImportPNR(request: ImportPNRRequest, pnr: string): Promise<BookingResponse | IError> {
     try {
         const config = await getConfig(request.credentialType);
         const credentials = request.vendorList[0].credential;
@@ -177,8 +177,8 @@ export function getTravelerDetails(travelerDetails: PNRPax[]): TravelerDetails[]
                     country: "",
                     countryCode: "",
                     email: "",
-                    mobile: pax[3] || "",
-                    phone: pax[3] || "",
+                    mobile: pax[2] || "",
+                    phone: pax[2] || "",
                     postalCode: "",
                     isdCode: "",
                 },
@@ -250,12 +250,12 @@ export async function getSegmentDetails(routeInfo: PNRRouteInfo[]): Promise<AirS
                 "operatingCarrier": {
                     "code": airlineCode
                 },
-                "flyingTime": "04:30",
+                "flyingTime": "",
                 "travelTime": "",
-                "equipType": "773",
+                "equipType": "",
                 "group": "0",
-                "baggageInfo": "1PCG",
-                "handBaggage": "7KG",
+                "baggageInfo": "",
+                "handBaggage": "",
                 "offerDetails": null,
                 "productClass": "",
                 "noSeats": 0,

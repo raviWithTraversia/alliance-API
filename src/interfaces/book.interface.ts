@@ -34,11 +34,27 @@ export interface BookingRequest {
     traceId: string;
     vendorList: Vendor[];
     journey: BookingRequestJourney[];
+    gstDetails?: GSTDetails | null;
 }
 export interface BookingResponse {
     uniqueKey: string;
     traceId: string;
     journey: BookingResponseJourney[];
+    gstDetails?: GSTDetails | null;
+}
+export interface GSTDetails {
+    fullName?: string | null;
+    emailAddress?: string | null;
+    homePhone?: string | null;
+    workPhone?: string | null;
+    gstNumber?: string | null;
+    companyName?: string | null;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    provinceState?: string | null;
+    postalCode?: string | null;
+    countryCode?: string | null;
 }
 export interface TravelerDetails {
     travellerId: string;
@@ -48,17 +64,23 @@ export interface TravelerDetails {
     middleName?: string;
     lastName: string;
     dob: string;
+    age: number;
     gender: string;
-    seatPreferences: [] | null;
-    baggagePreferences: [] | null;
-    mealPreferences: [] | null;
+    seatPreferences: null,
+    mealPreferences: null,
+    baggagePreferences: null,
+    ffwdPreferences: null,
+    bofPreferences: null,
+    priortyCheckinPreference: null,
+    loungePreference: null,
     passportDetails: PassportDetails | null;
     contactDetails: ContactDetails | null;
     frequentFlyer: FrequentFlyer[] | null;
-    nationality: string;
-    department: string;
-    designation: string;
-    eTicket: null | ETicket[]
+    nationality?: string;
+    // department: string;
+    // designation: string;
+    eTicket: null | ETicket[],
+    emd: null
 }
 
 export interface PassportDetails {

@@ -94,8 +94,6 @@ export function getFareBreakup(fare: FareDetailsList): FareBreakup {
  * @returns An array of FareInfo objects.
  */
 export function getFareInfo(fare_details: FareSuccessResponse): FareInfo[] {
-    saveLogInFile("fare-info.json", fare_details as any);
-    // const fare_keys = getFareKeys(fare_details.fare_info_index);
     return fare_details.fare_info.map((fare) => {
         return {
             fareBasis: fare[0],

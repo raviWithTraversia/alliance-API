@@ -56,7 +56,7 @@ export async function convertSegment(sectors: AllianceFlight[], fare: FareInfo):
             airlineName: airline?.airlineName || "",
             fltNum,
             classofService: "",
-            cabinClass: "",
+            cabinClass: "Economy",
             departure: await createFlightSegment({ code: sector[1], date: sector[3], time: sector[5], terminal: sector[14] }),
             arrival: await createFlightSegment({ code: sector[2], date: sector[4], time: sector[6], terminal: sector[15] }),
             operatingCarrier: {

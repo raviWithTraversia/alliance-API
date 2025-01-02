@@ -47,6 +47,28 @@ export interface PNRRetrieveResponse {
     pay_limit: string;
     create_time: string;
 };
+export interface PNRFareRetrieveResponse {
+    ws_access_id: number;
+    access_time: string;
+    elapsed_time: string;
+    err_code: string;
+    book_code: string;
+    book_ccy: string;
+    book_balance: string;
+    normal_sales: string;
+    detail_price: PNRFareDetail[];
+}
+
+export type PNRFareDetail = [
+    string, //book_code
+    string, //passenger_name
+    string, //origin
+    string, //destination
+    string, //fare_type
+    number, //amount
+];
+
+export type AlliancePaxType = ['A', 'C', "I"];
 
 export type PNRPax = [
     string, // firstName

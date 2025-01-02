@@ -152,7 +152,6 @@ export async function convertItinerary(
         : { request: SearchRequest, sectors: AllianceFlight[], fareResponse: FareSuccessResponse, index: number }): Promise<Itinerary[] | IError> {
     try {
         const fares = getFareInfo(fareResponse);
-        saveLogInFile("fare-info.json", fares as any);
         const paxList: Pax[] = [
             {
                 type: "ADT",

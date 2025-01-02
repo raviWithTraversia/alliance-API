@@ -1,13 +1,23 @@
+// External imports
 import axios from "axios";
-import { Config, DEFAULTS, getConfig } from "../configs/config";
-import { ImportPNRRequest, PNRPax, PNRRetrieveResponse, PNRRouteInfo } from "../interfaces/import-pnr.interfaces";
-import { Credential } from "../interfaces/search.interface";
-import { saveLogInFile } from "../utils/save-log";
-import { IError } from "../interfaces/common.interface";
 import dayjs from "dayjs";
 import { randomUUID } from "crypto";
+
+// Config imports
+import { Config, DEFAULTS, getConfig } from "../configs/config";
+
+// Interface imports
+import { ImportPNRRequest, PNRFareRetrieveResponse, PNRPax, PNRRetrieveResponse, PNRRouteInfo } from "../interfaces/import-pnr.interfaces";
+import { AirSegment, Credential, PriceBreakup } from "../interfaces/search.interface";
+import { IError } from "../interfaces/common.interface";
+import { BookingResponse, BookingStatus, RecordLocator, TravelerDetails } from "../interfaces/book.interface";
+
+// Utility imports
+import { saveLogInFile } from "../utils/save-log";
+import { PriceBreakupResult } from "../utils/price-breakup";
+
+// Model imports
 import Airline from "../models/airline.model";
-import { convertTimePeriod } from "../utils/time-format";
 import Airport from "../models/airport.model";
 
 export async function handleImportPNR(request: ImportPNRRequest, pnr: string): Promise<any | IError> {
@@ -15,16 +25,20 @@ export async function handleImportPNR(request: ImportPNRRequest, pnr: string): P
         const config = await getConfig(request.credentialType);
         const credentials = request.vendorList[0].credential;
 
-        const bookingResponse = await handleFetchPNRDetails(request, config, credentials, pnr);
+        const bookingResponse = await handleFetchPNRDetails({ config, credentials, pnr });
         if ('error' in bookingResponse) return bookingResponse;
-        return convertToCommonPNRResponse(request, bookingResponse);
+        const fareResult = await handleFetchPNRFareDetails({ config, credentials, pnr });
+        if ('error' in fareResult) return fareResult;
+        return convertToCommonPNRResponse({ request, result: bookingResponse, fareResult });
     } catch (error: any) {
         console.log({ importPNRError: error });
         return { error: { message: error.message, stack: error.stack } }
     }
 }
 
-export async function handleFetchPNRDetails(request: ImportPNRRequest, config: Config, credentials: Credential, pnr: string): Promise<PNRRetrieveResponse | IError> {
+export async function handleFetchPNRDetails({ config, credentials, pnr }
+    : { config: Config, credentials: Credential, pnr: string })
+    : Promise<PNRRetrieveResponse | IError> {
     try {
         const url = new URL(config.BASE_URL);
         const options = new URLSearchParams();
@@ -47,19 +61,85 @@ export async function handleFetchPNRDetails(request: ImportPNRRequest, config: C
     }
 }
 
-export async function convertToCommonPNRResponse(request: ImportPNRRequest, PNRResponse: PNRRetrieveResponse) {
+export async function handleFetchPNRFareDetails({ config, credentials, pnr }
+    : { config: Config, credentials: Credential, pnr: string })
+    : Promise<PNRFareRetrieveResponse | IError> {
     try {
-        const travelerDetails: any = getTravelerDetails(PNRResponse.pax_list);
-        const airSegments: any = getSegmentDetails(PNRResponse.route_info);
+        const url = new URL(config.BASE_URL);
+        const options = new URLSearchParams();
+
+        options.append("rqid", credentials.userId);
+        options.append("airline_code", DEFAULTS.SUPPLIER_CODE);
+        options.append("action", config.endpoints.retrieve_pnr_fare);
+        options.append("app", "information");
+        options.append("book_code", pnr);
+
+        url.search = options.toString();
+        saveLogInFile("pnr-fare-retrieve.req.json", url.toString());
+        const response = await axios.get(url.toString());
+        saveLogInFile("pnr-fare-retrieve.res.json", response.data);
+        if (response.data.err_code != "0") return { error: { message: response.data.err_msg } };
+        return response.data as PNRFareRetrieveResponse;
+    } catch (error: any) {
+        console.log({ errorFetchingPNRFareDetails: error });
+        return { error: { message: error.message, stack: error.stack } }
+    }
+}
+
+export async function convertToCommonPNRResponse({ request, result, fareResult }: { request: ImportPNRRequest, result: PNRRetrieveResponse, fareResult: PNRFareRetrieveResponse }): Promise<BookingResponse | IError> {
+    try {
+        const travelerDetails = getTravelerDetails(result.pax_list);
+        const fare = getFareDetails(fareResult, travelerDetails);
+        if ('error' in fare) return fare;
+        saveLogInFile("fare-details.json", fare as any);
+        const airSegments = await getSegmentDetails(result.route_info);
+        let recLocInfo: RecordLocator[] | null = null;
+        const status: BookingStatus = {
+            pnrStatus: "Failed",
+            paymentStatus: "Unpaid"
+        };
+        if (result.book_code) {
+            recLocInfo = [{
+                type: "GDS",
+                pnr: result.book_code
+            }];
+            status.pnrStatus = "Confirmed";
+        }
+        if (travelerDetails.some((traveler) => traveler.eTicket)) status.paymentStatus = "Paid";
         return {
             uniqueKey: request.uniqueKey || randomUUID(),
             traceId: request.traceId || randomUUID(),
             journey: [{
-                status: {},
-                recLocInfo: null,
+                journeyKey: randomUUID(),
+                origin: request.journey[0].origin,
+                destination: request.journey[0].destination,
+                status,
+                recLocInfo,
                 travellerDetails: travelerDetails,
                 itinerary: [{
-                    airSegments
+                    uid: randomUUID().toString(),
+                    indexNumber: 1,
+                    baseFare: fare.baseFare,
+                    taxes: fare.taxes,
+                    totalPrice: fare.totalPrice,
+                    currency: "",
+                    provider: "9I",
+                    promoCodeType: "",
+                    valCarrier: "",
+                    fareFamily: "Regular Fare",
+                    airSegments,
+                    priceBreakup: fare.priceBreakup,
+                    freeSeat: false,
+                    freeMeal: false,
+                    carbonEmission: "",
+                    refundableFare: false,
+                    fareType: "",
+                    promotionalCode: "",
+                    key: "",
+                    hostTokens: [],
+                    sessionKey: "",
+                    inPolicy: false,
+                    isRecommended: false
                 }]
             }]
         }
@@ -69,16 +149,16 @@ export async function convertToCommonPNRResponse(request: ImportPNRRequest, PNRR
     }
 }
 
-export function getTravelerDetails(travelerDetails: PNRPax[]) {
+export function getTravelerDetails(travelerDetails: PNRPax[]): TravelerDetails[] {
     const travelerList: any = [];
     const types: any = {
         A: "ADT",
         C: "CHD",
         I: "INF"
-    }
+    };
     for (let pax of travelerDetails) {
         try {
-            const traveler = {
+            const traveler: TravelerDetails = {
                 travellerId: pax[11],
                 type: types[pax[5]],
                 title: pax[10],
@@ -98,6 +178,7 @@ export function getTravelerDetails(travelerDetails: PNRPax[]) {
                     countryCode: "",
                     email: "",
                     mobile: pax[3] || "",
+                    phone: pax[3] || "",
                     postalCode: "",
                     isdCode: "",
                 },
@@ -112,8 +193,16 @@ export function getTravelerDetails(travelerDetails: PNRPax[]) {
                     number: pax[3] ?? "",
                     issuingCountry: pax[4] ?? "",
                     expiry: "",
-                } : null
+                } : null,
+                eTicket: null,
+                emd: null
+                // nationality: "",
+                // department: "",
+                // designation: ""
             };
+            if (pax[6]) traveler.eTicket = [{
+                eTicketNumber: pax[6]
+            }];
             travelerList.push(traveler);
         } catch (error: any) {
             console.log({ errorConvertingTravelerDetails: error });
@@ -122,7 +211,7 @@ export function getTravelerDetails(travelerDetails: PNRPax[]) {
     return travelerList;
 }
 
-export async function getSegmentDetails(routeInfo: PNRRouteInfo[]) {
+export async function getSegmentDetails(routeInfo: PNRRouteInfo[]): Promise<AirSegment[]> {
     const airSegments: any = [];
     for (let route of routeInfo) {
         try {
@@ -135,7 +224,7 @@ export async function getSegmentDetails(routeInfo: PNRRouteInfo[]) {
                 "airlineName": airline?.airlineName ?? "",
                 "fltNum": flightNumber,
                 "classofService": "",
-                "cabinClass": "",
+                "cabinClass": "Economy",
                 "departure": {
                     "code": route[0],
                     "date": convertDate(route[2]),
@@ -183,7 +272,79 @@ export async function getSegmentDetails(routeInfo: PNRRouteInfo[]) {
     return airSegments;
 }
 
-const months: any = {
+export function getFareDetails(fareResult: PNRFareRetrieveResponse, travelerDetails: TravelerDetails[]): PriceBreakupResult | IError {
+    try {
+        const paxTypeMap: any = {};
+        travelerDetails.forEach((traveler) => {
+            paxTypeMap[`${traveler.firstName} ${traveler.lastName}`.toUpperCase()] = traveler.type;
+        });
+        let totalPrice = 0;
+        let baseFare = 0;
+        let taxes = 0;
+
+        const fareBreakup: { [type: string]: PriceBreakup } = {
+            "ADT": {
+                passengerType: "ADT",
+                noOfPassenger: 0,
+                baseFare: 0,
+                tax: 0,
+                taxBreakup: [],
+                airPenalty: [],
+                key: ""
+            },
+            "CHD": {
+                passengerType: "CHD",
+                noOfPassenger: 0,
+                baseFare: 0,
+                tax: 0,
+                taxBreakup: [],
+                airPenalty: [],
+                key: ""
+            },
+            "INF": {
+                passengerType: "INF",
+                noOfPassenger: 0,
+                baseFare: 0,
+                tax: 0,
+                taxBreakup: [],
+                airPenalty: [],
+                key: ""
+            },
+        }
+
+        const count: any = {};
+        for (let fare of fareResult.detail_price) {
+            const type = paxTypeMap[fare[1].toUpperCase()];
+            if (!count[fare[1].toUpperCase()]) {
+                fareBreakup[type].noOfPassenger += 1;
+                count[fare[1].toUpperCase()] = true;
+            }
+            totalPrice += fare[5];
+            if (fare[4] === "Basic Fare") {
+                baseFare += fare[5];
+                fareBreakup[type].baseFare = fare[5];
+            } else {
+                taxes += fare[5];
+                if (!fareBreakup[type].taxBreakup.find((tax) => tax.taxType === fare[4])) {
+                    fareBreakup[type].tax += fare[5];
+                    fareBreakup[type].taxBreakup.push({ taxType: fare[4], amount: fare[5] });
+                }
+            }
+        }
+
+        return {
+            priceBreakup: Object.values(fareBreakup),
+            totalPrice,
+            taxes,
+            baseFare
+        }
+    } catch (error: any) {
+        console.log({ errorGettingFareDetails: error });
+        return { error: { message: error.message, stack: error.stack } }
+    }
+}
+
+export const months: any = {
     JAN: '01',
     FEB: '02',
     MAR: '03',
@@ -197,6 +358,7 @@ const months: any = {
     NOV: '11',
     DEC: '12'
 }
+
 export function convertDate(dateString: string, forSegment?: boolean) {
     const [day, monthName, year2Digit] = dateString.split("-");
     const year = Number(year2Digit) > 50 && !forSegment ? `19${year2Digit}` : `20${year2Digit}`;

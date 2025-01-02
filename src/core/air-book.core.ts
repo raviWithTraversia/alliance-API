@@ -10,7 +10,6 @@ import { AllianceBookResponse, AlliancePaymentResponse, BookingErrorResponse, Bo
 import { IError } from "../interfaces/common.interface";
 import { saveLogInFile } from "../utils/save-log";
 
-
 export async function handleBooking(request: BookingRequest): Promise<BookingErrorResponse | BookingResponse> {
     const defaultStatus: BookingStatus = {
         pnrStatus: "Failed",
@@ -93,6 +92,14 @@ export async function processBooking(request: BookingRequest, config: Config): P
         const fareBasisCodesString = getFareBasisCodes(itinerary.airSegments);
         options.append("subclass_dep", fareBasisCodesString);
         options.append("caller", travelerDetails[0].firstName);
+        if ('gstDetails' in request && request.gstDetails) {
+            if (request.gstDetails?.gstNumber)
+                options.append("company_gst_no", request.gstDetails.gstNumber);
+            if (request.gstDetails?.companyName)
+                options.append("company_name", request.gstDetails.companyName);
+            if (request.gstDetails?.addressLine1)
+                options.append("company_location", `${request.gstDetails?.addressLine1 ?? ""} ${request.gstDetails?.addressLine2 ?? ""} ${request.gstDetails?.city ?? ""} ${request.gstDetails?.countryCode ?? ""} ${request.gstDetails?.postalCode ?? ""}`);
+        }
         const counts: any = {
             ADT: 0,
             CHD: 0,
@@ -126,8 +133,8 @@ export async function processBooking(request: BookingRequest, config: Config): P
             if (traveler.passportDetails) {
                 options.append(`${typeKey}_passport_${paxIdx}`, traveler.passportDetails.number);
                 options.append(`${typeKey}_passport_exp_${paxIdx}`, dayjs(traveler.passportDetails.expiry, "YYYY-MM-DD").format("YYYYMMDD"));
+                options.append(`${typeKey}_nationality_${paxIdx}`, traveler.passportDetails.issuingCountry);
             }
-            options.append(`${typeKey}_nationality_${paxIdx}`, traveler.nationality);
         })
 
         options.append("num_pax_adult", counts.ADT);
@@ -162,6 +169,7 @@ export async function processPayment(request: BookingRequest, config: Config, bo
         options.append("action", config.endpoints.payment);
         options.append("app", "transaction");
         options.append("book_code", bookResponse.book_code);
+        // options.append("amount", request.journey[0].itinerary[0].totalPrice.toString());
         url.search = options.toString();
         saveLogInFile("payment.req.json", url.toString());
         const response = await axios.get(url.toString());

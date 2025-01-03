@@ -11,7 +11,7 @@ export const vendorListValidations = [
     check('vendorList.*.fareTypes').isArray().withMessage('fareTypes must be an array for each vendor'),
     check('vendorList.*.includeAirlines').isArray().withMessage('includeAirlines must be an array for each vendor'),
     check('vendorList.*.excludeAirlines').isArray().withMessage('excludeAirlines must be an array for each vendor')
-]
+];
 
 export const itineraryListValidations = [
     check("journey.*.itinerary")

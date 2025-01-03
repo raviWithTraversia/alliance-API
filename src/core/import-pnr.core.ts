@@ -40,7 +40,7 @@ export async function handleImportPNR(request: ImportPNRRequest, pnr: string): P
 export async function handleFetchPNRDetails({ config, credentials, pnr, request }
     : { config: Config, credentials: Credential, pnr: string, request: ImportPNRRequest })
     : Promise<PNRRetrieveResponse | IError> {
-    let vendorRequest: any = null;
+    let vendorRequest: string = "";
     let vendorResponse: any = null;
     try {
         const url = new URL(config.BASE_URL);
@@ -146,9 +146,12 @@ export async function convertToCommonPNRResponse({ request, result, fareResult }
                 type: "GDS",
                 pnr: result.book_code
             }];
-            status.pnrStatus = "Confirmed";
+            status.pnrStatus = "Hold";
         }
-        if (travelerDetails.some((traveler) => traveler.eTicket)) status.paymentStatus = "Paid";
+        if (travelerDetails.some((traveler) => traveler.eTicket)) {
+            status.paymentStatus = "Paid";
+            status.pnrStatus = "Confirm";
+        }
         return {
             uniqueKey: request.uniqueKey || randomUUID(),
             traceId: request.traceId || randomUUID(),
@@ -182,7 +185,7 @@ export async function convertToCommonPNRResponse({ request, result, fareResult }
                     hostTokens: [],
                     sessionKey: "",
                     inPolicy: false,
-                    isRecommended: false
+                    isRecommended: true
                 }]
             }]
         }
@@ -235,7 +238,7 @@ export function getTravelerDetails(travelerDetails: PNRPax[]): TravelerDetails[]
                 passportDetails: pax[3] ? {
                     number: pax[3] ?? "",
                     issuingCountry: pax[4] ?? "",
-                    expiry: "",
+                    expiryDate: "",
                 } : null,
                 eTicket: null,
                 emd: null

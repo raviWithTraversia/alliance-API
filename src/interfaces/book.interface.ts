@@ -19,7 +19,7 @@ export interface BookingResponse {
     journey: BookingResponseJourney[];
 }
 export interface BookingStatus {
-    pnrStatus: "Failed" | "Pending" | "Confirmed";
+    pnrStatus: "Failed" | "Hold" | "Confirm";
     paymentStatus: "Unpaid" | "Paid";
 }
 export interface RecordLocator {
@@ -81,7 +81,7 @@ export interface TravelerDetails {
 export interface PassportDetails {
     number: string;
     issuingCountry: string;
-    expiry: string;
+    expiryDate: string;
 }
 
 export interface ContactDetails {

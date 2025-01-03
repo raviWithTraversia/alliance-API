@@ -69,10 +69,10 @@ export const passportValidations = [
     }),
     check(travelerDetailsPath + "passportDetails").custom((value) => {
         if (!value) return true;
-        if (!value.expiry) throw new Error("missing traveller's passport expiry date");
-        if (!dayjs(value.expiry, "YYYY-MM-DD", true).isValid())
+        if (!value.expiryDate) throw new Error("missing traveller's passport expiry date");
+        if (!dayjs(value.expiryDate, "YYYY-MM-DD", true).isValid())
             throw new Error(`invalid traveller's passport expiry date format, valid format is 'YYYY-MM-DD'`);
-        if (dayjs(value.expiry).isBefore(dayjs()))
+        if (dayjs(value.expiryDate).isBefore(dayjs()))
             throw new Error("traveller's passport expired, according to passport expiry date");
         return true;
     }),

@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { searchController } from '../controllers/search.controller';
 import { validateRequest } from '../middleware/validateRequest';
-import { airPricingValidations } from '../utils/validations/air-pricing.validations';
+import { importPNRValidations } from '../utils/validations/import-pnr.validations';
+import { ticketController } from '../controllers/ticket.controller';
 
 const router = Router();
 
-router.post('/ticket', airPricingValidations, validateRequest, searchController);
+router.post('/ticket', importPNRValidations, validateRequest, ticketController);
 
 export default router;

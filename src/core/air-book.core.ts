@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import { Config, DEFAULTS, getConfig } from "../configs/config";
 import { AirSegment } from "../interfaces/search.interface";
 import { AllianceBookResponse, AlliancePaymentResponse, BookingErrorResponse, BookingRequest, BookingResponse, BookingStatus, ETicket } from "../interfaces/book.interface";
-import { IError } from "../interfaces/common.interface";
+import { CommonRequest, IError } from "../interfaces/common.interface";
 import { saveLogInFile } from "../utils/save-log";
 import { handleImportPNR } from "./import-pnr.core";
 import { ImportPNRRequest } from "../interfaces/import-pnr.interfaces";
@@ -40,25 +40,29 @@ export async function handleBooking(request: BookingRequest): Promise<BookingErr
         if ('error' in bookResponse)
             return { response, error: { message: bookResponse.error.message } };
 
-        status.pnrStatus = "Confirmed";
-        response.journey[0].recLocInfo = [{
-            type: "GDS",
-            pnr: bookResponse.book_code
-        }];
-        if (request.isHoldBooking == false) {
-            const paymentResponse = await processPayment(request, config, bookResponse.book_code);
-            if ('ticket_unit' in paymentResponse) {
-                status.paymentStatus = "Paid";
-                const ticketMap: { [key: string]: ETicket[] } = {};
-                paymentResponse?.ticket_unit?.forEach?.((ticket) => {
-                    if (!ticketMap[ticket[0]]) ticketMap[ticket[0]] = [];
-                    ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] } as ETicket);
-                });
-                response.journey[0].travellerDetails.forEach((traveler) => {
-                    const fullName = `${traveler.firstName} ${traveler.lastName}`.toUpperCase();
-                    traveler.eTicket = ticketMap[fullName] || null;
-                })
-            }
+        if (bookResponse.book_code) {
+            status.pnrStatus = "Hold";
+            response.journey[0].recLocInfo = [{
+                type: "GDS",
+                pnr: bookResponse.book_code
+            }];
+        }
+        if (!request.isHoldBooking) {
+            // const paymentResponse =
+            await processPayment(request, config, bookResponse.book_code);
+            // if ('ticket_unit' in paymentResponse) {
+            //     status.paymentStatus = "Paid";
+            //     status.pnrStatus = "Confirm";
+            //     const ticketMap: { [key: string]: ETicket[] } = {};
+            //     paymentResponse?.ticket_unit?.forEach?.((ticket) => {
+            //         if (!ticketMap[ticket[0]]) ticketMap[ticket[0]] = [];
+            //         ticketMap[ticket[0]].push({ eTicketNumber: ticket[1] } as ETicket);
+            //     });
+            //     response.journey[0].travellerDetails.forEach((traveler) => {
+            //         const fullName = `${traveler.firstName} ${traveler.lastName}`.toUpperCase();
+            //         traveler.eTicket = ticketMap[fullName] || null;
+            //     })
+            // }
         }
         const importPNRRequest: ImportPNRRequest = {
             typeOfTrip: request.typeOfTrip,
@@ -163,7 +167,7 @@ export async function processBooking(request: BookingRequest, config: Config): P
 
             if (traveler.passportDetails) {
                 options.append(`${typeKey}_passport_${paxIdx}`, traveler.passportDetails.number);
-                options.append(`${typeKey}_passport_exp_${paxIdx}`, dayjs(traveler.passportDetails.expiry, "YYYY-MM-DD").format("YYYYMMDD"));
+                options.append(`${typeKey}_passport_exp_${paxIdx}`, dayjs(traveler.passportDetails.expiryDate, "YYYY-MM-DD").format("YYYYMMDD"));
                 options.append(`${typeKey}_nationality_${paxIdx}`, traveler.passportDetails.issuingCountry);
             }
         })
@@ -209,7 +213,7 @@ export async function processBooking(request: BookingRequest, config: Config): P
     }
 }
 
-export async function processPayment(request: BookingRequest, config: Config, pnr: string): Promise<AlliancePaymentResponse | IError> {
+export async function processPayment(request: CommonRequest, config: Config, pnr: string): Promise<AlliancePaymentResponse | IError> {
     let vendorRequest: any = null;
     let vendorResponse: any = null;
 
@@ -222,6 +226,7 @@ export async function processPayment(request: BookingRequest, config: Config, pn
         options.append("action", config.endpoints.payment);
         options.append("app", "transaction");
         options.append("book_code", pnr);
+        // options.append("amount", "1");
         // options.append("amount", request.journey[0].itinerary[0].totalPrice.toString());
         url.search = options.toString();
         saveLogInFile("payment.req.json", url.toString());

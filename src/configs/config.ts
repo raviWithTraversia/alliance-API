@@ -46,5 +46,6 @@ export async function getConfig(ENV: string): Promise<Config> {
 export const DEFAULTS = {
     SUPPLIER_CODE: "9I",
     CABIN_CLASS: "Economy" as "Economy",
-    CLASS_OF_SERVICE: "Y"
-}
+    CLASS_OF_SERVICE: "Y",
+    NO_OF_SEATS: 9,
+} as const;

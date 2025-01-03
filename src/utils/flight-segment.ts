@@ -51,7 +51,7 @@ export async function convertSegment(sectors: AllianceFlight[], fare: FareInfo):
         const [airlineCode, fltNum] = sector?.[0]?.split?.("-") || [];
         const airline: any = airlineCode
             && (await Airline.findOne({ airlineCode }));
-        const noOfSeats = sector?.[10]?.find?.((item: any) => ["S", "A"].includes(item[0]));
+        // const noOfSeats = sector?.[10]?.find?.((item: any) => ["S", "A"].includes(item[0]));
         const segment: AirSegment = {
             airlineCode,
             airlineName: airline?.airlineName || "",
@@ -71,7 +71,8 @@ export async function convertSegment(sectors: AllianceFlight[], fare: FareInfo):
             handBaggage: "",
             offerDetails: null,
             productClass: "",
-            noSeats: noOfSeats?.[1] ? parseInt(noOfSeats?.[1]) : 0,
+            noSeats: DEFAULTS.NO_OF_SEATS,
+            // noSeats: noOfSeats?.[1] ? parseInt(noOfSeats?.[1]) : 0,
             fareBasisCode: fare.fareBasis,
             availabilitySource: "",
             isConnect: false,

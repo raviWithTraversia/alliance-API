@@ -5,7 +5,8 @@ import { randomUUID } from "crypto";
 
 // Internal imports
 import { Config, DEFAULTS, getConfig } from "../configs/config";
-import { AllianceFlight, AllianceSearchResponse, Credential, FareSuccessResponse, Itinerary, Journey, SearchRequest, SearchResponse } from "../interfaces/search.interface";
+import { AllianceFlight, AllianceSearchResponse, FareSuccessResponse, Itinerary, Journey, SearchRequest, SearchResponse } from "../interfaces/search.interface";
+
 import { saveLogInFile } from "../utils/save-log";
 import { getFareInfo } from "../utils/fare-utils";
 import { convertSegment } from "../utils/flight-segment";

@@ -1,7 +1,4 @@
-export type TravelType = "DOM" | "INT";
-export type TypeOfTrip = "ONEWAY" | "ROUNDTRIP";
-export type CredentialType = "TEST" | "LIVE";
-export type CabinClass = "" | "Economy" | "PremiumEconomy" | "Business" | "First";
+import { CabinClass, CommonRequest } from "./common.interface";
 
 export interface Sector {
     origin: string;
@@ -20,41 +17,7 @@ export interface PaxDetail {
     senior: number;
 }
 
-export interface Vendor {
-    vendorCode: string;
-    credential: Credential;
-    corporatedealCode: CorporateDeal[];
-    fareTypes: string[];
-    productClass: string[] | null;
-    includeAirlines: string[];
-    excludeAirlines: string[];
-}
-
-export interface Credential {
-    userId: string;
-    password: string;
-    pseudoCityCode: string;
-    wSAP_TargetBranch: string;
-    accountNumber: string;
-}
-
-export interface CorporateDeal {
-    airlineCode: string;
-    dealCode: string;
-    dealCodeType: string;
-}
-
-export interface SearchRequest {
-    typeOfTrip: TypeOfTrip;
-    credentialType: CredentialType;
-    travelType: TravelType;
-    systemEntity: string;
-    systemName: string;
-    corpCode: string;
-    requestorCode: string;
-    empCode: string;
-    uniqueKey: string;
-    traceId?: string;
+export interface SearchRequest extends CommonRequest {
     version: string;
     sectors: Sector[];
     paxDetail: PaxDetail;
@@ -63,7 +26,6 @@ export interface SearchRequest {
     returnSpecialFare: boolean;
     refundableOnly: boolean;
     includeAirlines: string[];
-    vendorList: Vendor[];
 }
 
 export interface SearchResponse {
@@ -94,6 +56,7 @@ export interface Journey {
     destination: string;
     itinerary: Itinerary[]
 }
+
 export interface Itinerary {
     uid: string;
     indexNumber: number;
@@ -199,13 +162,6 @@ export type AllianceFlight = [
     string // arrivalDate
 ];
 
-export interface FareErrorResponse {
-    ws_access_id: number;
-    access_time: string;
-    elapsed_time: string;
-    err_code: "0";
-    err_msg: string;
-}
 export interface FareSuccessResponse {
     ws_access_id: number;
     access_time: string;

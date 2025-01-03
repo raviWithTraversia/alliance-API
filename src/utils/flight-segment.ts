@@ -8,6 +8,7 @@ import Airport from "../models/airport.model";
 import { AirportDetail, AirSegment, AllianceFlight, FareInfo } from "../interfaces/search.interface";
 import Airline from "../models/airline.model";
 import { convertTimePeriod } from "./time-format";
+import { DEFAULTS } from "../configs/config";
 
 /**
  * Creates a flight segment object with formatted date and time, and additional airport information.
@@ -55,8 +56,8 @@ export async function convertSegment(sectors: AllianceFlight[], fare: FareInfo):
             airlineCode,
             airlineName: airline?.airlineName || "",
             fltNum,
-            classofService: "",
-            cabinClass: "Economy",
+            classofService: DEFAULTS.CLASS_OF_SERVICE,
+            cabinClass: DEFAULTS.CABIN_CLASS,
             departure: await createFlightSegment({ code: sector[1], date: sector[3], time: sector[5], terminal: sector[14] }),
             arrival: await createFlightSegment({ code: sector[2], date: sector[4], time: sector[6], terminal: sector[15] }),
             operatingCarrier: {

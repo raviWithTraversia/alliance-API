@@ -11,6 +11,7 @@ import searchRoutes from "./routes/search.routes";
 import airPricingRoutes from "./routes/air-pricing.routes";
 import bookRoutes from "./routes/air-book.routes";
 import importPNRRoutes from "./routes/import-pnr.routes";
+import ticketRoutes from "./routes/ticket.routes";
 
 dotenv.config({ path: `${ROOT_DIR}/.env` });
 
@@ -27,8 +28,9 @@ app.use("/api/flight", searchRoutes);
 app.use("/api/pricing", airPricingRoutes);
 app.use("/api/booking", bookRoutes);
 app.use("/api/pnr", importPNRRoutes);
+app.use("/api/pnr", ticketRoutes);
 
-app.use("/api", (req: Request, res: Response) => {
+app.use("/api", (_req: Request, res: Response) => {
     res.json({ message: "9I API" });
 })
 

@@ -8,8 +8,8 @@ import { Config, DEFAULTS, getConfig } from "../configs/config";
 
 // Interface imports
 import { ImportPNRRequest, PNRFareRetrieveResponse, PNRPax, PNRRetrieveResponse, PNRRouteInfo } from "../interfaces/import-pnr.interfaces";
-import { AirSegment, Credential, PriceBreakup } from "../interfaces/search.interface";
-import { IError } from "../interfaces/common.interface";
+import { AirSegment, PriceBreakup } from "../interfaces/search.interface";
+import { Credential, IError } from "../interfaces/common.interface";
 import { BookingResponse, BookingStatus, RecordLocator, TravelerDetails } from "../interfaces/book.interface";
 
 // Utility imports
@@ -266,8 +266,8 @@ export async function getSegmentDetails(routeInfo: PNRRouteInfo[]): Promise<AirS
                 "airlineCode": airlineCode,
                 "airlineName": airline?.airlineName ?? "",
                 "fltNum": flightNumber,
-                "classofService": "",
-                "cabinClass": "Economy",
+                "classofService": DEFAULTS.CLASS_OF_SERVICE,
+                "cabinClass": DEFAULTS.CABIN_CLASS,
                 "departure": {
                     "code": route[0],
                     "date": convertDate(route[2]),

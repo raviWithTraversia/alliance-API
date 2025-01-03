@@ -1,9 +1,6 @@
 // INTERFACE IMPORTS
 import { FareBreakup, FareDetailsList, FareInfo, FareSuccessResponse } from "../interfaces/search.interface";
 
-// UTILITY IMPORTS
-import { saveLogInFile } from "./save-log";
-
 export type TaxKeys = [
     "insurance",
     "airport_tax",

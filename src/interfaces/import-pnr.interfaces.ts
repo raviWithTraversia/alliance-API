@@ -1,17 +1,6 @@
-import { CredentialType, TravelType, TypeOfTrip, Vendor } from "./search.interface";
+import { CommonRequest } from "./common.interface";
 
-export interface ImportPNRRequest {
-    typeOfTrip: TypeOfTrip;
-    credentialType: CredentialType;
-    travelType: TravelType;
-    systemEntity?: string;
-    systemName?: string;
-    corpCode?: string;
-    requestorCode?: string;
-    empCode?: string;
-    uniqueKey: string;
-    traceId: string;
-    vendorList: Vendor[];
+export interface ImportPNRRequest extends CommonRequest {
     journey: ImportPNRJourney[]
 };
 

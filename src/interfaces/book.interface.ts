@@ -1,5 +1,5 @@
-import { IError } from "./common.interface";
-import { CredentialType, Journey, TravelType, TypeOfTrip, Vendor } from "./search.interface";
+import { CommonRequest, IError } from "./common.interface";
+import { Journey } from "./search.interface";
 
 export type PaxType = ["ADT", "CHD", "INF"];
 
@@ -26,18 +26,7 @@ export interface RecordLocator {
     type: string;
     pnr: string;
 }
-export interface BookingRequest {
-    typeOfTrip: TypeOfTrip;
-    credentialType: CredentialType;
-    travelType: TravelType;
-    systemEntity: string;
-    systemName: string;
-    corpCode: string;
-    requestorCode: string;
-    empCode: string;
-    uniqueKey: string;
-    traceId: string;
-    vendorList: Vendor[];
+export interface BookingRequest extends CommonRequest {
     journey: BookingRequestJourney[];
     gstDetails?: GSTDetails | null;
     isHoldBooking: boolean;

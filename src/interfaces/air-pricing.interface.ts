@@ -1,16 +1,7 @@
-import { CredentialType, Journey, TypeOfTrip, Vendor } from "../interfaces/search.interface";
+import { Journey } from "../interfaces/search.interface";
+import { CommonRequest } from "./common.interface";
 
-export interface AirPricingRequest {
-    typeOfTrip: TypeOfTrip;
-    credentialType: CredentialType;
-    systemEntity: string;
-    systemName: string;
-    corpCode: string;
-    requestorCode: string;
-    empCode: string;
-    uniqueKey: string;
-    traceId: string;
-    vendorList: Vendor[];
+export interface AirPricingRequest extends CommonRequest {
     journey: Journey[];
 }
 

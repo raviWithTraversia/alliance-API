@@ -46,7 +46,7 @@ export async function handleBooking(request: BookingRequest): Promise<BookingErr
             pnr: bookResponse.book_code
         }];
         if (request.isHoldBooking == false) {
-            const paymentResponse = await processPayment(request, config, bookResponse);
+            const paymentResponse = await processPayment(request, config, bookResponse.book_code);
             if ('ticket_unit' in paymentResponse) {
                 status.paymentStatus = "Paid";
                 const ticketMap: { [key: string]: ETicket[] } = {};
@@ -209,7 +209,7 @@ export async function processBooking(request: BookingRequest, config: Config): P
     }
 }
 
-export async function processPayment(request: BookingRequest, config: Config, bookResponse: AllianceBookResponse): Promise<AlliancePaymentResponse | IError> {
+export async function processPayment(request: BookingRequest, config: Config, pnr: string): Promise<AlliancePaymentResponse | IError> {
     let vendorRequest: any = null;
     let vendorResponse: any = null;
 
@@ -221,7 +221,7 @@ export async function processPayment(request: BookingRequest, config: Config, bo
         options.append("airline_code", DEFAULTS.SUPPLIER_CODE);
         options.append("action", config.endpoints.payment);
         options.append("app", "transaction");
-        options.append("book_code", bookResponse.book_code);
+        options.append("book_code", pnr);
         // options.append("amount", request.journey[0].itinerary[0].totalPrice.toString());
         url.search = options.toString();
         saveLogInFile("payment.req.json", url.toString());
